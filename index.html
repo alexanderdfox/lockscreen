@@ -267,19 +267,23 @@ unlockBtn.addEventListener('click', ()=>{
   if(!combination) return alert('No combination saved!');
   let allCorrect = true;
   spinners.forEach((spinner,i)=>{
-	const rect = spinner.getBoundingClientRect();
-	const x = rect.left + rect.width/2 - gridContainer.getBoundingClientRect().left;
-	const y = rect.top + rect.height/2 - gridContainer.getBoundingClientRect().top;
-	const gridX = Math.floor(x/cellSize);
-	const gridY = Math.floor(y/cellSize);
-	const rotation = Math.round(spinner.currentRotation%360);
-	if(gridX!==combination[i].x || gridY!==combination[i].y || rotation!==combination[i].rotation){
-	  allCorrect=false;
-	}
+    const rect = spinner.getBoundingClientRect();
+    const x = rect.left + rect.width/2 - gridContainer.getBoundingClientRect().left;
+    const y = rect.top + rect.height/2 - gridContainer.getBoundingClientRect().top;
+    const gridX = Math.floor(x/cellSize);
+    const gridY = Math.floor(y/cellSize);
+    const rotation = Math.round(spinner.currentRotation % 360);
+    
+    // Check if rotation is within ±20 degrees
+    const savedRotation = combination[i].rotation;
+    const deltaRotation = Math.abs(((rotation - savedRotation + 180) % 360) - 180); // shortest angle
+    if(gridX !== combination[i].x || gridY !== combination[i].y || deltaRotation > 20){
+      allCorrect = false;
+    }
   });
   if(allCorrect){
-	unlockedMsg.style.display='block';
-	setTimeout(()=>window.location.href='https://example.com',500);
+    unlockedMsg.style.display='block';
+    setTimeout(()=>window.location.href='https://example.com',500);
   } else alert('Incorrect combination!');
 });
 </script>
