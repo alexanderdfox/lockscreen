@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockScreen</title>
+<style>
+  body, html {
+	height: 100%;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background: #111;
+	color: #fff;
+	font-family: sans-serif;
+	user-select: none;
+	touch-action: none;
+  }
+
+  .lock-container {
+	position: relative;
+	width: 400px;
+	height: 400px;
+	margin-bottom: 20px;
+  }
+
+  .circle {
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	border: 4px solid #fff;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: relative;
+	overflow: hidden;
+  }
+
+  .grid {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	grid-template-rows: repeat(4, 1fr);
+	pointer-events: none;
+  }
+
+  .grid div {
+	border: 1px solid rgba(255,255,255,0.2);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	font-size: 12px;
+	color: rgba(255,255,255,0.5);
+  }
+
+  .spinner {
+	width: 60px;
+	height: 60px;
+	background: radial-gradient(circle, #ff3, #f90);
+	border-radius: 50%;
+	position: absolute;
+	cursor: grab;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	font-weight: bold;
+	font-size: 16px;
+	color: #000;
+	user-select: none;
+	transform-origin: center;
+	flex-direction: column;
+  }
+
+  .degrees {
+	font-size: 14px;
+	color: #000;
+	margin-top: 4px;
+  }
+
+  .unlocked {
+	position: absolute;
+	top: -50px;
+	left: 50%;
+	transform: translateX(-50%);
+	font-size: 24px;
+	color: #0f0;
+	animation: fade 1s ease-in-out forwards;
+	display: none;
+  }
+
+  button {
+	margin: 5px;
+	padding: 8px 16px;
+	font-size: 16px;
+	cursor: pointer;
+	border: none;
+	border-radius: 6px;
+	background: #0af;
+	color: #000;
+	font-weight: bold;
+  }
+
+  button:disabled {
+	background: #444;
+	cursor: not-allowed;
+  }
+
+  @keyframes fade {
+	0% {opacity: 0;}
+	100% {opacity: 1;}
+  }
+</style>
+</head>
+<body>
+
+<div class="lock-container">
+  <div class="circle">
+	<div class="grid" id="grid"></div>
+	<div class="unlocked" id="unlocked">Unlocked!</div>
+  </div>
+</div>
+
+<div>
+  <button id="lockBtn">Lock</button>
+  <button id="unlockBtn" disabled>Unlock</button>
+</div>
+
+<script>
+const circle = document.querySelector('.circle');
+const unlockedMsg = document.getElementById('unlocked');
+const grid = document.getElementById('grid');
+const lockBtn = document.getElementById('lockBtn');
+const unlockBtn = document.getElementById('unlockBtn');
+
+const gridSize = 4;
+const cellSize = circle.clientWidth / gridSize;
+
+let spinners = [];
+let combination = null;
+
+// Initialize grid cells
+for(let y=0; y<gridSize; y++){
+  for(let x=0; x<gridSize; x++){
+	let cell = document.createElement('div');
+	cell.textContent = `${x},${y}`;
+	grid.appendChild(cell);
+  }
+}
+
+// Create 4 spinners
+for(let i=0; i<4; i++){
+  const spinner = document.createElement('div');
+  spinner.className = 'spinner';
+  spinner.innerHTML = `🌀<div class="degrees">000°</div>`;
+  circle.appendChild(spinner);
+  spinner.currentRotation = 0;
+  spinner.velocity = 0;
+  spinner.lastY = 0;
+  spinner.dragging = false;
+  spinners.push(spinner);
+  // Arrange roughly in a square
+  const margin = 50;
+  spinner.style.left = `${margin + (i%2)*150}px`;
+  spinner.style.top = `${margin + Math.floor(i/2)*150}px`;
+}
+
+// Helper: get mouse/touch position
+function getXY(e){
+  if(e.touches) return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+  return {x: e.clientX, y: e.clientY};
+}
+
+let activeSpinner = null;
+
+function startDrag(e){
+  const {x, y} = getXY(e);
+  activeSpinner = e.currentTarget;
+  activeSpinner.dragging = true;
+  activeSpinner.offsetX = x - activeSpinner.offsetLeft;
+  activeSpinner.offsetY = y - activeSpinner.offsetTop;
+  activeSpinner.lastY = y;
+  activeSpinner.velocity = 0;
+  activeSpinner.style.cursor = 'grabbing';
+  e.preventDefault();
+}
+
+function moveDrag(e){
+  if(!activeSpinner || !activeSpinner.dragging) return;
+  const {x, y} = getXY(e);
+
+  // Drag position
+  let newX = x - activeSpinner.offsetX;
+  let newY = y - activeSpinner.offsetY;
+
+  // Keep inside circle
+  const centerX = circle.clientWidth/2 - activeSpinner.clientWidth/2;
+  const centerY = circle.clientHeight/2 - activeSpinner.clientHeight/2;
+  let dx = newX - centerX;
+  let dy = newY - centerY;
+  let distance = Math.sqrt(dx*dx + dy*dy);
+  let radius = circle.clientWidth/2 - activeSpinner.clientWidth/2;
+  if(distance > radius){
+	newX = centerX + dx/distance * radius;
+	newY = centerY + dy/distance * radius;
+  }
+  activeSpinner.style.left = newX + 'px';
+  activeSpinner.style.top = newY + 'px';
+
+  // Rotation based on vertical drag
+  let deltaY = y - activeSpinner.lastY;
+  activeSpinner.currentRotation += deltaY;
+  activeSpinner.velocity = deltaY;
+  activeSpinner.style.transform = `rotate(${activeSpinner.currentRotation}deg)`;
+  activeSpinner.querySelector('.degrees').textContent = `${('000' + Math.round(activeSpinner.currentRotation % 360)).slice(-3)}°`;
+  activeSpinner.lastY = y;
+}
+
+function endDrag(){
+  if(activeSpinner) activeSpinner.dragging = false;
+  if(activeSpinner) activeSpinner.style.cursor = 'grab';
+  activeSpinner = null;
+}
+
+// Momentum animation
+function animateMomentum(){
+  spinners.forEach(spinner => {
+	if(!spinner.dragging){
+	  if(Math.abs(spinner.velocity) > 0.1){
+		spinner.currentRotation += spinner.velocity;
+		spinner.style.transform = `rotate(${spinner.currentRotation}deg)`;
+		spinner.querySelector('.degrees').textContent = `${('000' + Math.round(spinner.currentRotation % 360)).slice(-3)}°`;
+		spinner.velocity *= 0.95;
+	  } else {
+		spinner.velocity = 0;
+	  }
+	}
+  });
+  requestAnimationFrame(animateMomentum);
+}
+animateMomentum();
+
+// Drag event listeners
+spinners.forEach(spinner => {
+  spinner.addEventListener('mousedown', startDrag);
+  spinner.addEventListener('touchstart', startDrag, {passive:false});
+});
+
+document.addEventListener('mousemove', moveDrag);
+document.addEventListener('touchmove', moveDrag, {passive:false});
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
+
+// Lock button
+lockBtn.addEventListener('click', () => {
+  combination = spinners.map(spinner => {
+	const x = spinner.offsetLeft + spinner.clientWidth/2;
+	const y = spinner.offsetTop + spinner.clientHeight/2;
+	const gridX = Math.floor(x / cellSize);
+	const gridY = Math.floor(y / cellSize);
+	return {x: gridX, y: gridY, rotation: Math.round(spinner.currentRotation % 360)};
+  });
+  alert('Combination saved for all 4 spinners!');
+  unlockBtn.disabled = false;
+  lockBtn.disabled = true;
+});
+
+// Unlock button (exact degrees)
+unlockBtn.addEventListener('click', () => {
+  if(!combination) return alert('No combination saved!');
+  let allCorrect = true;
+  spinners.forEach((spinner, i) => {
+	const x = spinner.offsetLeft + spinner.clientWidth/2;
+	const y = spinner.offsetTop + spinner.clientHeight/2;
+	const gridX = Math.floor(x / cellSize);
+	const gridY = Math.floor(y / cellSize);
+	const rotation = Math.round(spinner.currentRotation % 360);
+	if(gridX !== combination[i].x || gridY !== combination[i].y || rotation !== combination[i].rotation){
+	  allCorrect = false;
+	}
+  });
+  if(allCorrect){
+	unlockedMsg.style.display = 'block';
+	setTimeout(() => window.location.href = 'https://example.com', 500);
+  } else {
+	alert('Incorrect combination!');
+  }
+});
+</script>
+
+</body>
+</html>
