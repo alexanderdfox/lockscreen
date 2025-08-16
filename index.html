@@ -256,6 +256,7 @@ document.addEventListener('touchend', endDrag);
 
 // Lock button
 lockBtn.addEventListener('click', () => {
+  // Save combination
   combination = spinners.map(spinner => {
 	const x = spinner.offsetLeft + spinner.clientWidth/2;
 	const y = spinner.offsetTop + spinner.clientHeight/2;
@@ -263,10 +264,26 @@ lockBtn.addEventListener('click', () => {
 	const gridY = Math.floor(y / cellSize);
 	return {x: gridX, y: gridY, rotation: Math.round(spinner.currentRotation % 360)};
   });
-  alert('Combination saved for all 4 spinners!');
+  
+  // Randomize spinner positions and rotations
+  spinners.forEach(spinner => {
+	const radius = circle.clientWidth/2 - spinner.clientWidth/2;
+	const angle = Math.random() * 2 * Math.PI;
+	const r = Math.random() * radius;
+	const centerX = circle.clientWidth/2 - spinner.clientWidth/2;
+	const centerY = circle.clientHeight/2 - spinner.clientHeight/2;
+	spinner.style.left = `${centerX + r * Math.cos(angle)}px`;
+	spinner.style.top = `${centerY + r * Math.sin(angle)}px`;
+	spinner.currentRotation = Math.floor(Math.random() * 360);
+	spinner.style.transform = `rotate(${spinner.currentRotation}deg)`;
+	spinner.querySelector('.degrees').textContent = `${('000' + spinner.currentRotation).slice(-3)}°`;
+  });
+
+  alert('Combination saved for all 4 spinners! They have been randomized.');
   unlockBtn.disabled = false;
   lockBtn.disabled = true;
 });
+
 
 // Unlock button (exact degrees)
 unlockBtn.addEventListener('click', () => {
